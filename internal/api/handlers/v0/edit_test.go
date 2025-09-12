@@ -42,7 +42,7 @@ func TestEditServerEndpoint(t *testing.T) {
 	assert.NotNil(t, published.Meta)
 	assert.NotNil(t, published.Meta.Official)
 
-	testServerID := published.Meta.Official.ID
+	testServerID := published.Meta.Official.ServerID
 
 	// Publish a second server for permission testing
 	otherServer := apiv0.ServerJSON{
@@ -62,7 +62,7 @@ func TestEditServerEndpoint(t *testing.T) {
 	assert.NotNil(t, otherPublished.Meta)
 	assert.NotNil(t, otherPublished.Meta.Official)
 
-	otherServerID := otherPublished.Meta.Official.ID
+	otherServerID := otherPublished.Meta.Official.ServerID
 
 	// Publish a deleted server for undelete testing
 	deletedServer := apiv0.ServerJSON{
@@ -82,15 +82,16 @@ func TestEditServerEndpoint(t *testing.T) {
 	assert.NotNil(t, deletedPublished.Meta)
 	assert.NotNil(t, deletedPublished.Meta.Official)
 
-	deletedServerID := deletedPublished.Meta.Official.ID
+	deletedServerID := deletedPublished.Meta.Official.ServerID
 
 	testCases := []struct {
-		name           string
-		authHeader     string
-		requestBody    interface{}
-		serverID       string
-		expectedStatus int
-		expectedError  string
+		name              string
+		authHeader        string
+		requestBody       interface{}
+		serverID          string
+		version           string
+		expectedStatus    int
+		expectedError     string
 	}{
 		{
 			name: "successful edit with valid token and permissions",
@@ -293,7 +294,11 @@ func TestEditServerEndpoint(t *testing.T) {
 			}
 
 			// Create request
-			req := httptest.NewRequest(http.MethodPut, "/v0/servers/"+tc.serverID, bytes.NewReader(requestBody))
+			url := "/v0/servers/" + tc.serverID
+			if tc.version != "" {
+				url += "?version=" + tc.version
+			}
+			req := httptest.NewRequest(http.MethodPut, url, bytes.NewReader(requestBody))
 			req.Header.Set("Content-Type", "application/json")
 			if tc.authHeader != "" {
 				req.Header.Set("Authorization", tc.authHeader)

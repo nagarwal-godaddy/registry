@@ -8,7 +8,8 @@ import (
 
 // RegistryExtensions represents registry-generated metadata
 type RegistryExtensions struct {
-	ID          string    `json:"id"`
+	ServerID    string    `json:"server_id"`    // Consistent ID across all versions of a server
+	VersionID   string    `json:"version_id"`   // Unique ID for this specific version
 	PublishedAt time.Time `json:"published_at"`
 	UpdatedAt   time.Time `json:"updated_at,omitempty"`
 	IsLatest    bool      `json:"is_latest"`
@@ -48,7 +49,14 @@ type Metadata struct {
 
 func (s *ServerJSON) GetID() string {
 	if s.Meta != nil && s.Meta.Official != nil {
-		return s.Meta.Official.ID
+		return s.Meta.Official.ServerID
+	}
+	return ""
+}
+
+func (s *ServerJSON) GetVersionID() string {
+	if s.Meta != nil && s.Meta.Official != nil {
+		return s.Meta.Official.VersionID
 	}
 	return ""
 }

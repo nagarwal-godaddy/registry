@@ -354,7 +354,7 @@ func TestServersListEndpoint(t *testing.T) {
 					assert.NotEmpty(t, server.Description)
 					assert.NotNil(t, server.Meta)
 					assert.NotNil(t, server.Meta.Official)
-					assert.NotEmpty(t, server.Meta.Official.ID)
+					assert.NotEmpty(t, server.Meta.Official.VersionID)
 				}
 
 				// Check metadata if expected
@@ -388,15 +388,15 @@ func TestServersDetailEndpoint(t *testing.T) {
 	assert.NoError(t, err)
 
 	testCases := []struct {
-		name           string
-		serverID       string
-		expectedStatus int
-		expectedServer *apiv0.ServerJSON
-		expectedError  string
+		name              string
+		serverID          string
+		expectedStatus    int
+		expectedServer    *apiv0.ServerJSON
+		expectedError     string
 	}{
 		{
 			name:           "successful get server detail",
-			serverID:       testServer.Meta.Official.ID,
+			serverID:       testServer.Meta.Official.ServerID,
 			expectedStatus: http.StatusOK,
 		},
 		{
@@ -476,7 +476,7 @@ func TestServersEndpointsIntegration(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, published)
 
-	serverID := published.Meta.Official.ID
+	serverID := published.Meta.Official.ServerID
 	servers := []apiv0.ServerJSON{*published}
 	serverDetail := published
 

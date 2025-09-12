@@ -36,21 +36,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServerList'
-  /v0/servers/{id}:
+  /v0/servers/{server_id}:
     get:
       summary: Get MCP server details
-      description: Returns detailed information about a specific MCP server
+      description: Returns detailed information about a specific MCP server. Returns latest version by default, or specific version if version query parameter is provided.
       parameters:
-        - name: id
+        - name: server_id
           in: path
           required: true
-          description: Unique ID of the server
+          description: Unique server ID (consistent across all versions)
           schema:
             type: string
             format: uuid
         - name: version
           in: query
-          description: Desired MCP server version
+          description: Specific version to retrieve (e.g., "1.0.0"). If not provided, returns latest version.
           schema:
             type: string
       responses:
@@ -60,6 +60,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ServerDetail'
+        '404':
+          description: Server not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+                    example: "Server not found"
+  /v0/servers/{server_id}/versions:
+    get:
+      summary: List all versions of an MCP server
+      description: Returns all available versions for a specific MCP server, ordered by publication date (newest first)
+      parameters:
+        - name: server_id
+          in: path
+          required: true
+          description: Unique server ID (consistent across all versions)
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: A list of all versions for the server
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServerList'
         '404':
           description: Server not found
           content:

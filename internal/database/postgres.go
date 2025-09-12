@@ -115,12 +115,12 @@ func (db *PostgreSQL) List(
 		}
 	}
 
-	// Add cursor pagination using primary key ID
+	// Add cursor pagination using primary key version_id
 	if cursor != "" {
 		if _, err := uuid.Parse(cursor); err != nil {
 			return nil, "", fmt.Errorf("invalid cursor format: %w", err)
 		}
-		whereConditions = append(whereConditions, fmt.Sprintf("id > $%d", argIndex))
+		whereConditions = append(whereConditions, fmt.Sprintf("version_id > $%d", argIndex))
 		args = append(args, cursor)
 		argIndex++
 	}
@@ -136,7 +136,7 @@ func (db *PostgreSQL) List(
         SELECT value
         FROM servers
         %s
-        ORDER BY id
+        ORDER BY version_id
         LIMIT $%d
     `, whereClause, argIndex)
 	args = append(args, limit)
@@ -169,12 +169,12 @@ func (db *PostgreSQL) List(
 		return nil, "", fmt.Errorf("error iterating rows: %w", err)
 	}
 
-	// Determine next cursor using registry metadata ID
+	// Determine next cursor using registry metadata VersionID
 	nextCursor := ""
 	if len(results) > 0 && len(results) >= limit {
 		lastResult := results[len(results)-1]
 		if lastResult.Meta != nil && lastResult.Meta.Official != nil {
-			nextCursor = lastResult.Meta.Official.ID
+			nextCursor = lastResult.Meta.Official.VersionID
 		}
 	}
 
@@ -189,7 +189,7 @@ func (db *PostgreSQL) GetByID(ctx context.Context, id string) (*apiv0.ServerJSON
 	query := `
 		SELECT value
 		FROM servers
-		WHERE id = $1
+		WHERE version_id = $1
 	`
 
 	var valueJSON []byte
@@ -212,18 +212,138 @@ func (db *PostgreSQL) GetByID(ctx context.Context, id string) (*apiv0.ServerJSON
 	return &serverJSON, nil
 }
 
+// GetByServerID retrieves the latest version of a server by server ID
+func (db *PostgreSQL) GetByServerID(ctx context.Context, serverID string) (*apiv0.ServerJSON, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	query := `
+		SELECT value
+		FROM servers
+		WHERE server_id = $1 AND (value->'_meta'->'io.modelcontextprotocol.registry/official'->>'is_latest')::boolean = true
+		ORDER BY (value->'_meta'->'io.modelcontextprotocol.registry/official'->>'published_at')::timestamp DESC
+		LIMIT 1
+	`
+
+	var valueJSON []byte
+
+	err := db.pool.QueryRow(ctx, query, serverID).Scan(&valueJSON)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get server by server ID: %w", err)
+	}
+
+	// Parse the complete ServerJSON from JSONB
+	var serverJSON apiv0.ServerJSON
+	if err := json.Unmarshal(valueJSON, &serverJSON); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal server JSON: %w", err)
+	}
+
+	return &serverJSON, nil
+}
+
+// GetByServerIDAndVersion retrieves a specific version of a server by server ID and version
+func (db *PostgreSQL) GetByServerIDAndVersion(ctx context.Context, serverID string, version string) (*apiv0.ServerJSON, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	query := `
+		SELECT value
+		FROM servers
+		WHERE server_id = $1 AND value->>'version' = $2
+		LIMIT 1
+	`
+
+	var valueJSON []byte
+
+	err := db.pool.QueryRow(ctx, query, serverID, version).Scan(&valueJSON)
+
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("failed to get server by server ID and version: %w", err)
+	}
+
+	// Parse the complete ServerJSON from JSONB
+	var serverJSON apiv0.ServerJSON
+	if err := json.Unmarshal(valueJSON, &serverJSON); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal server JSON: %w", err)
+	}
+
+	return &serverJSON, nil
+}
+
+// GetAllVersionsByServerID retrieves all versions of a server by server ID
+func (db *PostgreSQL) GetAllVersionsByServerID(ctx context.Context, serverID string) ([]*apiv0.ServerJSON, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	query := `
+		SELECT value
+		FROM servers
+		WHERE server_id = $1
+		ORDER BY (value->'_meta'->'io.modelcontextprotocol.registry/official'->>'published_at')::timestamp DESC
+	`
+
+	rows, err := db.pool.Query(ctx, query, serverID)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query server versions: %w", err)
+	}
+	defer rows.Close()
+
+	var results []*apiv0.ServerJSON
+	for rows.Next() {
+		var valueJSON []byte
+
+		err := rows.Scan(&valueJSON)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan server row: %w", err)
+		}
+
+		// Parse the complete ServerJSON from JSONB
+		var serverJSON apiv0.ServerJSON
+		if err := json.Unmarshal(valueJSON, &serverJSON); err != nil {
+			return nil, fmt.Errorf("failed to unmarshal server JSON: %w", err)
+		}
+
+		results = append(results, &serverJSON)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	if len(results) == 0 {
+		return nil, ErrNotFound
+	}
+
+	return results, nil
+}
+
 // CreateServer adds a new server to the database
 func (db *PostgreSQL) CreateServer(ctx context.Context, server *apiv0.ServerJSON) (*apiv0.ServerJSON, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
 
-	// Get the ID from the registry metadata
+	// Get the IDs from the registry metadata
 	if server.Meta == nil || server.Meta.Official == nil {
-		return nil, fmt.Errorf("server must have registry metadata with ID")
+		return nil, fmt.Errorf("server must have registry metadata with ServerID and VersionID")
 	}
 
-	id := server.Meta.Official.ID
+	serverID := server.Meta.Official.ServerID
+	versionID := server.Meta.Official.VersionID
+
+	if serverID == "" || versionID == "" {
+		return nil, fmt.Errorf("server must have both ServerID and VersionID in registry metadata")
+	}
 
 	// Marshal the complete server to JSONB
 	valueJSON, err := json.Marshal(server)
@@ -231,13 +351,13 @@ func (db *PostgreSQL) CreateServer(ctx context.Context, server *apiv0.ServerJSON
 		return nil, fmt.Errorf("failed to marshal server JSON: %w", err)
 	}
 
-	// Insert into simple servers table
+	// Insert into servers table with new schema
 	query := `
-		INSERT INTO servers (id, value)
-		VALUES ($1, $2)
+		INSERT INTO servers (server_id, version_id, value)
+		VALUES ($1, $2, $3)
 	`
 
-	_, err = db.pool.Exec(ctx, query, id, valueJSON)
+	_, err = db.pool.Exec(ctx, query, serverID, versionID, valueJSON)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert server: %w", err)
 	}
@@ -251,9 +371,9 @@ func (db *PostgreSQL) UpdateServer(ctx context.Context, id string, server *apiv0
 		return nil, ctx.Err()
 	}
 
-	// Validate that meta structure exists and ID matches path
-	if server.Meta == nil || server.Meta.Official == nil || server.Meta.Official.ID != id {
-		return nil, fmt.Errorf("%w: io.modelcontextprotocol.registry/official.id must match path id (%s)", ErrInvalidInput, id)
+	// Validate that meta structure exists and VersionID matches path
+	if server.Meta == nil || server.Meta.Official == nil || server.Meta.Official.VersionID != id {
+		return nil, fmt.Errorf("%w: io.modelcontextprotocol.registry/official.version_id must match path id (%s)", ErrInvalidInput, id)
 	}
 
 	// Marshal updated server
@@ -262,11 +382,11 @@ func (db *PostgreSQL) UpdateServer(ctx context.Context, id string, server *apiv0
 		return nil, fmt.Errorf("failed to marshal updated server: %w", err)
 	}
 
-	// Update the complete server record in simple table
+	// Update the complete server record using version_id
 	query := `
 		UPDATE servers 
 		SET value = $1
-		WHERE id = $2
+		WHERE version_id = $2
 	`
 
 	result, err := db.pool.Exec(ctx, query, valueJSON, id)
