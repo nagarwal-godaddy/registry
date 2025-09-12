@@ -278,12 +278,12 @@ func (s *registryServiceImpl) getCurrentLatestVersion(existingServerVersions []*
 }
 
 // EditServer updates an existing server with new details (admin operation)
-func (s *registryServiceImpl) EditServer(versionId string, req apiv0.ServerJSON) (*apiv0.ServerJSON, error) {
+func (s *registryServiceImpl) EditServer(versionID string, req apiv0.ServerJSON) (*apiv0.ServerJSON, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// First get the current server to preserve metadata
-	currentServer, err := s.db.GetByVersionID(ctx, versionId)
+	currentServer, err := s.db.GetByVersionID(ctx, versionID)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +316,7 @@ func (s *registryServiceImpl) EditServer(versionId string, req apiv0.ServerJSON)
 	}
 
 	// Update server in database
-	serverRecord, err := s.db.UpdateServer(ctx, versionId, &updatedServer)
+	serverRecord, err := s.db.UpdateServer(ctx, versionID, &updatedServer)
 	if err != nil {
 		return nil, err
 	}
