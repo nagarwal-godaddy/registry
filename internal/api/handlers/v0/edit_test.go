@@ -20,6 +20,7 @@ import (
 	"github.com/modelcontextprotocol/registry/pkg/model"
 )
 
+
 func TestEditServerEndpoint(t *testing.T) {
 	// Create registry service and insert a common test server
 	registryService := service.NewRegistryService(database.NewMemoryDB(), config.NewConfig())
@@ -115,9 +116,10 @@ func TestEditServerEndpoint(t *testing.T) {
 					Source: "github",
 					ID:     "domdomegg/test-server",
 				},
-				Version: "1.0.1",
+				Version: "1.0.0",
 			},
 			serverID:       testServerID,
+			version:        "1.0.0",
 			expectedStatus: http.StatusOK,
 		},
 		{
@@ -125,6 +127,7 @@ func TestEditServerEndpoint(t *testing.T) {
 			authHeader:     "",
 			requestBody:    apiv0.ServerJSON{},
 			serverID:       testServerID,
+			version:        "1.0.0",
 			expectedStatus: 422,
 			expectedError:  "required header parameter is missing",
 		},
@@ -137,6 +140,7 @@ func TestEditServerEndpoint(t *testing.T) {
 				Version: "1.0.0",
 			},
 			serverID:       testServerID,
+			version:        "1.0.0",
 			expectedStatus: http.StatusUnauthorized,
 			expectedError:  "Unauthorized",
 		},
@@ -149,6 +153,7 @@ func TestEditServerEndpoint(t *testing.T) {
 				Version: "1.0.0",
 			},
 			serverID:       testServerID,
+			version:        "1.0.0",
 			expectedStatus: http.StatusUnauthorized,
 			expectedError:  "Unauthorized",
 		},
@@ -171,6 +176,7 @@ func TestEditServerEndpoint(t *testing.T) {
 				Version: "1.0.0",
 			},
 			serverID:       testServerID,
+			version:        "1.0.0",
 			expectedStatus: http.StatusForbidden,
 			expectedError:  "Forbidden",
 		},
@@ -193,6 +199,7 @@ func TestEditServerEndpoint(t *testing.T) {
 				Version: "1.0.0",
 			},
 			serverID:       otherServerID,
+			version:        "1.0.0",
 			expectedStatus: http.StatusForbidden,
 			expectedError:  "Forbidden",
 		},
@@ -215,6 +222,7 @@ func TestEditServerEndpoint(t *testing.T) {
 				Version: "1.0.0",
 			},
 			serverID:       "550e8400-e29b-41d4-a716-446655440999", // Non-existent ID
+			version:        "1.0.0",
 			expectedStatus: http.StatusNotFound,
 			expectedError:  "Not Found",
 		},
@@ -237,6 +245,7 @@ func TestEditServerEndpoint(t *testing.T) {
 				Version: "1.0.0",
 			},
 			serverID:       testServerID,
+			version:        "1.0.0",
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "Bad Request",
 		},
@@ -265,6 +274,7 @@ func TestEditServerEndpoint(t *testing.T) {
 				Version: "1.0.1",
 			},
 			serverID:       deletedServerID,
+			version:        "1.0.0",
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "Cannot change status of deleted server",
 		},
@@ -292,6 +302,7 @@ func TestEditServerEndpoint(t *testing.T) {
 				requestBody, err = json.Marshal(tc.requestBody)
 				assert.NoError(t, err)
 			}
+
 
 			// Create request
 			url := "/v0/servers/" + tc.serverID

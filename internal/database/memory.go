@@ -80,7 +80,7 @@ func (db *MemoryDB) List(
 	return result, nextCursor, nil
 }
 
-func (db *MemoryDB) GetByID(ctx context.Context, id string) (*apiv0.ServerJSON, error) {
+func (db *MemoryDB) GetByVersionID(ctx context.Context, versionID string) (*apiv0.ServerJSON, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -89,7 +89,7 @@ func (db *MemoryDB) GetByID(ctx context.Context, id string) (*apiv0.ServerJSON, 
 	defer db.mu.RUnlock()
 
 	// Find entry by registry metadata version_id
-	if entry, exists := db.entries[id]; exists {
+	if entry, exists := db.entries[versionID]; exists {
 		// Return a copy of the ServerRecord
 		entryCopy := *entry
 		return &entryCopy, nil

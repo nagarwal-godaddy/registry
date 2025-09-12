@@ -10,7 +10,7 @@ type RegistryService interface {
 	// Retrieve all servers with optional filtering
 	List(filter *database.ServerFilter, cursor string, limit int) ([]apiv0.ServerJSON, string, error)
 	// Retrieve a single server by registry metadata version ID
-	GetByID(id string) (*apiv0.ServerJSON, error)
+	GetByVersionID(versionID string) (*apiv0.ServerJSON, error)
 	// Retrieve latest version of a server by server ID
 	GetByServerID(serverID string) (*apiv0.ServerJSON, error)
 	// Retrieve specific version of a server by server ID and version

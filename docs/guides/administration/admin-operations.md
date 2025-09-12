@@ -46,11 +46,6 @@ curl -X PUT "https://registry.modelcontextprotocol.io/v0/servers/${SERVER_ID}?ve
   -H "Content-Type: application/json" \
   -d "$(cat server.json)"
 
-# Or update latest version (omit version parameter)
-curl -X PUT "https://registry.modelcontextprotocol.io/v0/servers/${SERVER_ID}" \
-  -H "Authorization: Bearer ${REGISTRY_TOKEN}" \
-  -H "Content-Type: application/json" \
-  -d "$(cat server.json)"
 ```
 
 ## Edit an Entire Server (All Versions)

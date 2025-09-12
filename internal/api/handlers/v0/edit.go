@@ -19,7 +19,7 @@ import (
 type EditServerInput struct {
 	Authorization string           `header:"Authorization" doc:"Registry JWT token with edit permissions" required:"true"`
 	ServerID      string           `path:"server_id" doc:"Server ID (UUID)" format:"uuid"`
-	Version       string           `query:"version" doc:"Version to edit (e.g., '1.0.0'). If not specified, edits latest version." required:"false" example:"1.0.0"`
+	Version       string           `query:"version" doc:"Version to edit (e.g., '1.0.0')" required:"true" example:"1.0.0"`
 	Body          apiv0.ServerJSON `body:""`
 }
 
@@ -33,7 +33,7 @@ func RegisterEditEndpoints(api huma.API, registry service.RegistryService, cfg *
 		Method:      http.MethodPut,
 		Path:        "/v0/servers/{server_id}",
 		Summary:     "Edit MCP server",
-		Description: "Update an existing MCP server (admin only). Edits latest version by default, or specific version if version query parameter is provided.",
+		Description: "Update an existing MCP server (admin only). Requires version query parameter to specify which version to edit.",
 		Tags:        []string{"admin"},
 		Security: []map[string][]string{
 			{"bearer": {}},
@@ -54,15 +54,7 @@ func RegisterEditEndpoints(api huma.API, registry service.RegistryService, cfg *
 		}
 
 		// Get current server to check permissions against existing name
-		var currentServer *apiv0.ServerJSON
-		
-		if input.Version != "" {
-			// Get specific version
-			currentServer, err = registry.GetByServerIDAndVersion(input.ServerID, input.Version)
-		} else {
-			// Get latest version
-			currentServer, err = registry.GetByServerID(input.ServerID)
-		}
+		currentServer, err := registry.GetByServerIDAndVersion(input.ServerID, input.Version)
 		
 		if err != nil {
 			if errors.Is(err, database.ErrNotFound) {

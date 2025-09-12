@@ -55,13 +55,13 @@ func (s *registryServiceImpl) List(filter *database.ServerFilter, cursor string,
 	return result, nextCursor, nil
 }
 
-// GetByID retrieves a specific server by its registry metadata version ID
-func (s *registryServiceImpl) GetByID(id string) (*apiv0.ServerJSON, error) {
+// GetByVersionID retrieves a specific server by its registry metadata version ID
+func (s *registryServiceImpl) GetByVersionID(versionID string) (*apiv0.ServerJSON, error) {
 	// Create a timeout context for the database operation
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	serverRecord, err := s.db.GetByID(ctx, id)
+	serverRecord, err := s.db.GetByVersionID(ctx, versionID)
 	if err != nil {
 		return nil, err
 	}
@@ -278,12 +278,12 @@ func (s *registryServiceImpl) getCurrentLatestVersion(existingServerVersions []*
 }
 
 // EditServer updates an existing server with new details (admin operation)
-func (s *registryServiceImpl) EditServer(id string, req apiv0.ServerJSON) (*apiv0.ServerJSON, error) {
+func (s *registryServiceImpl) EditServer(versionId string, req apiv0.ServerJSON) (*apiv0.ServerJSON, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	// First get the current server to preserve metadata
-	currentServer, err := s.db.GetByID(ctx, id)
+	currentServer, err := s.db.GetByVersionID(ctx, versionId)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +316,7 @@ func (s *registryServiceImpl) EditServer(id string, req apiv0.ServerJSON) (*apiv
 	}
 
 	// Update server in database
-	serverRecord, err := s.db.UpdateServer(ctx, id, &updatedServer)
+	serverRecord, err := s.db.UpdateServer(ctx, versionId, &updatedServer)
 	if err != nil {
 		return nil, err
 	}

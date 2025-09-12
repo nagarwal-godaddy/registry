@@ -33,7 +33,7 @@ type Database interface {
 	// Retrieve server entries with optional filtering
 	List(ctx context.Context, filter *ServerFilter, cursor string, limit int) ([]*apiv0.ServerJSON, string, error)
 	// Retrieve a single server by its version ID
-	GetByID(ctx context.Context, id string) (*apiv0.ServerJSON, error)
+	GetByVersionID(ctx context.Context, versionID string) (*apiv0.ServerJSON, error)
 	// Retrieve latest version of a server by server ID
 	GetByServerID(ctx context.Context, serverID string) (*apiv0.ServerJSON, error)
 	// Retrieve specific version of a server by server ID and version

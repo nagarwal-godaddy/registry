@@ -181,7 +181,7 @@ func (db *PostgreSQL) List(
 	return results, nextCursor, nil
 }
 
-func (db *PostgreSQL) GetByID(ctx context.Context, id string) (*apiv0.ServerJSON, error) {
+func (db *PostgreSQL) GetByVersionID(ctx context.Context, versionID string) (*apiv0.ServerJSON, error) {
 	if ctx.Err() != nil {
 		return nil, ctx.Err()
 	}
@@ -194,7 +194,7 @@ func (db *PostgreSQL) GetByID(ctx context.Context, id string) (*apiv0.ServerJSON
 
 	var valueJSON []byte
 
-	err := db.pool.QueryRow(ctx, query, id).Scan(&valueJSON)
+	err := db.pool.QueryRow(ctx, query, versionID).Scan(&valueJSON)
 
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
