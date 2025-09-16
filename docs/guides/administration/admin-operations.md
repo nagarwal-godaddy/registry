@@ -44,3 +44,27 @@ export SERVER_ID="<server-uuid>"
 ```
 
 This soft deletes the server. If you need to delete the content of a server (usually only where legally necessary), use the edit workflow above to scrub it all.
+
+## Rate Limiting Configuration
+
+The registry enforces daily publish rate limits to prevent abuse:
+
+### Environment Variables
+
+- `MCP_REGISTRY_RATE_LIMIT_ENABLED`: Enable/disable rate limiting (default: true)
+- `MCP_REGISTRY_RATE_LIMIT_PER_DAY`: Maximum publishes per user per day (default: 10)
+- `MCP_REGISTRY_RATE_LIMIT_EXEMPTIONS`: Comma-separated list of exempt users or patterns
+
+### Exemption Patterns
+
+Exemptions support wildcard patterns:
+- Exact match: `anthropic` (exempts user "anthropic")
+- Wildcard: `anthropic/*` (exempts "anthropic", "anthropic.claude", etc.)
+- Multiple exemptions: `anthropic/*,modelcontextprotocol,github/*`
+
+### Notes
+
+- Rate limits are per authenticated user (not per namespace)
+- Users with global admin permissions automatically bypass rate limits
+- Limits reset on a rolling 24-hour window
+- The counter is stored in the `publish_attempts` database table

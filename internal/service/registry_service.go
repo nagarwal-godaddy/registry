@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -71,10 +72,30 @@ func (s *registryServiceImpl) GetByID(id string) (*apiv0.ServerJSON, error) {
 }
 
 // Publish publishes a server with flattened _meta extensions
-func (s *registryServiceImpl) Publish(req apiv0.ServerJSON) (*apiv0.ServerJSON, error) {
+//nolint:cyclop // Complexity is necessary for validation, rate limiting, and version management
+func (s *registryServiceImpl) Publish(req apiv0.ServerJSON, authMethodSubject string, hasGlobalPermissions bool) (*apiv0.ServerJSON, error) {
 	// Create a timeout context for the database operation
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	// Check rate limiting (skip for admins with global permissions or disabled rate limiting)
+	if authMethodSubject != "" && s.cfg.RateLimitEnabled && !hasGlobalPermissions {
+		// Check if user is exempt from rate limiting
+		isExempt := s.isExemptFromRateLimit(authMethodSubject)
+		
+		if !isExempt {
+			// Check and increment the publish count atomically
+			currentCount, incrementSuccessful, err := s.db.CheckAndIncrementPublishCount(ctx, authMethodSubject, s.cfg.RateLimitPerDay)
+			if err != nil {
+				return nil, fmt.Errorf("failed to check rate limit: %w", err)
+			}
+			
+			if !incrementSuccessful {
+				return nil, fmt.Errorf("rate limit exceeded: you have published %d servers today (limit: %d per day). If you need a higher limit, please open an issue at https://github.com/modelcontextprotocol/registry/issues",
+					currentCount, s.cfg.RateLimitPerDay)
+			}
+		}
+	}
 
 	// Validate the request
 	if err := validators.ValidatePublishRequest(req, s.cfg); err != nil {
@@ -153,10 +174,23 @@ func (s *registryServiceImpl) Publish(req apiv0.ServerJSON) (*apiv0.ServerJSON, 
 			existingLatestID = existingLatest.Meta.Official.ID
 		}
 		if existingLatestID != "" {
-			// Update the existing server to set is_latest = false
-			existingLatest.Meta.Official.IsLatest = false
-			existingLatest.Meta.Official.UpdatedAt = time.Now()
-			if _, err := s.db.UpdateServer(ctx, existingLatestID, existingLatest); err != nil {
+			// Create a deep copy to avoid race conditions
+			updatedLatest := *existingLatest
+			if updatedLatest.Meta != nil {
+				// Create a copy of the Meta structure
+				metaCopy := *updatedLatest.Meta
+				updatedLatest.Meta = &metaCopy
+				
+				if updatedLatest.Meta.Official != nil {
+					// Create a copy of the Official metadata
+					officialCopy := *updatedLatest.Meta.Official
+					officialCopy.IsLatest = false
+					officialCopy.UpdatedAt = time.Now()
+					updatedLatest.Meta.Official = &officialCopy
+				}
+			}
+			
+			if _, err := s.db.UpdateServer(ctx, existingLatestID, &updatedLatest); err != nil {
 				return nil, err
 			}
 		}
@@ -198,6 +232,33 @@ func (s *registryServiceImpl) getCurrentLatestVersion(existingServerVersions []*
 		}
 	}
 	return nil
+}
+
+// isExemptFromRateLimit checks if an auth subject is exempt from rate limiting
+func (s *registryServiceImpl) isExemptFromRateLimit(authMethodSubject string) bool {
+	if s.cfg.RateLimitExemptions == "" {
+		return false
+	}
+	
+	exemptions := strings.Split(s.cfg.RateLimitExemptions, ",")
+	for _, exemption := range exemptions {
+		exemption = strings.TrimSpace(exemption)
+		if exemption == "" {
+			continue
+		}
+		
+		// Handle wildcard exemptions
+		if strings.HasSuffix(exemption, "/*") {
+			prefix := strings.TrimSuffix(exemption, "/*")
+			// Match auth subject exactly or with a separator
+			if authMethodSubject == prefix || strings.HasPrefix(authMethodSubject, prefix+".") || strings.HasPrefix(authMethodSubject, prefix+"/") {
+				return true
+			}
+		} else if exemption == authMethodSubject {
+			return true
+		}
+	}
+	return false
 }
 
 // EditServer updates an existing server with new details (admin operation)

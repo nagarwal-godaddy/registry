@@ -31,7 +31,7 @@ func TestPrometheusHandler(t *testing.T) {
 			ID:     "example/test-server",
 		},
 		Version: "2.0.0",
-	})
+	}, "testuser", false)
 	assert.NoError(t, err)
 
 	cfg := config.NewConfig()

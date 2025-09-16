@@ -6,21 +6,24 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	apiv0 "github.com/modelcontextprotocol/registry/pkg/api/v0"
 )
 
 // MemoryDB is an in-memory implementation of the Database interface
 type MemoryDB struct {
-	entries map[string]*apiv0.ServerJSON // maps registry metadata ID to ServerJSON
-	mu      sync.RWMutex
+	entries         map[string]*apiv0.ServerJSON // maps registry metadata ID to ServerJSON
+	publishAttempts map[string]map[string]int    // authMethodSubject -> date -> count
+	mu              sync.RWMutex
 }
 
 func NewMemoryDB() *MemoryDB {
 	// Convert input ServerJSON entries to have proper metadata
 	serverRecords := make(map[string]*apiv0.ServerJSON)
 	return &MemoryDB{
-		entries: serverRecords,
+		entries:         serverRecords,
+		publishAttempts: make(map[string]map[string]int),
 	}
 }
 
@@ -137,6 +140,58 @@ func (db *MemoryDB) UpdateServer(ctx context.Context, id string, server *apiv0.S
 
 	// Return the updated record
 	return server, nil
+}
+
+// IncrementPublishCount increments the publish count for an authenticated user today
+func (db *MemoryDB) IncrementPublishCount(_ context.Context, authMethodSubject string) error {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	today := time.Now().Format(time.DateOnly)
+	if db.publishAttempts[authMethodSubject] == nil {
+		db.publishAttempts[authMethodSubject] = make(map[string]int)
+	}
+	db.publishAttempts[authMethodSubject][today]++
+	return nil
+}
+
+// GetPublishCount returns the number of publishes for an authenticated user on a specific date
+func (db *MemoryDB) GetPublishCount(_ context.Context, authMethodSubject string, date time.Time) (int, error) {
+	db.mu.RLock()
+	defer db.mu.RUnlock()
+	
+	dateStr := date.Format(time.DateOnly)
+	if db.publishAttempts[authMethodSubject] == nil {
+		return 0, nil
+	}
+	return db.publishAttempts[authMethodSubject][dateStr], nil
+}
+
+// CheckAndIncrementPublishCount atomically checks if the count is under the limit and increments if so
+func (db *MemoryDB) CheckAndIncrementPublishCount(_ context.Context, authMethodSubject string, limit int) (currentCount int, incrementSuccessful bool, err error) {
+	db.mu.Lock()
+	defer db.mu.Unlock()
+	
+	today := time.Now().Format(time.DateOnly)
+	
+	// Initialize authMethodSubject map if needed
+	if db.publishAttempts[authMethodSubject] == nil {
+		db.publishAttempts[authMethodSubject] = make(map[string]int)
+	}
+	
+	// Get current count
+	currentCount = db.publishAttempts[authMethodSubject][today]
+	
+	// Check if under limit and increment if so
+	if currentCount < limit {
+		db.publishAttempts[authMethodSubject][today]++
+		currentCount++ // Return the new count after increment
+		incrementSuccessful = true
+	} else {
+		incrementSuccessful = false
+	}
+	
+	return currentCount, incrementSuccessful, nil
 }
 
 // For an in-memory database, this is a no-op

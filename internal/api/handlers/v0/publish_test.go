@@ -192,7 +192,7 @@ func TestPublishEndpoint(t *testing.T) {
 						ID:     "example/test-server-existing",
 					},
 				}
-				_, _ = registry.Publish(existingServer)
+				_, _ = registry.Publish(existingServer, "testuser", false)
 			},
 			expectedStatus: http.StatusBadRequest,
 			expectedError:  "invalid version: cannot publish duplicate version",

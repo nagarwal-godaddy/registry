@@ -90,6 +90,18 @@ Yes, extensions under the `x-publisher` property are preserved when publishing t
 
 At time of last update, this was open for discussion in [#104](https://github.com/modelcontextprotocol/registry/issues/104).
 
+### What are the rate limits for publishing?
+
+The registry enforces daily rate limits to prevent abuse:
+
+- **Default limit**: 10 publishes per authenticated user per day (rolling 24-hour window)
+- **Who is affected**: All users except those with global admin permissions
+- **What counts**: Each successful publish counts toward your daily limit
+- **Exemptions**: Specific users or organizations can be exempted from rate limiting
+- **Error message**: If you exceed the limit, you'll receive an error with your current count
+
+If you need a higher limit for legitimate use cases, please open an issue at https://github.com/modelcontextprotocol/registry/issues
+
 ### Can I publish a private server?
 
 Private servers are those that are only accessible to a narrow set of users. For example, servers published on a private network (like `mcp.acme-corp.internal`) or on private package registries (e.g. `npx -y @acme/mcp --registry https://artifactory.acme-corp.internal/npm`).
@@ -118,9 +130,15 @@ The MVP delegates security scanning to:
 - Namespace authentication requirements
 - Character limits and regex validation on free-form fields
 - Manual takedown of spam or malicious servers
+- Daily publish rate limiting per authenticated user (10 publishes per day by default)
+
+The rate limiting system:
+- Limits are per authenticated user (not per namespace)
+- Default limit is 10 publishes per 24-hour period
+- Administrators with global permissions bypass rate limits
+- Specific users or patterns can be exempted from rate limiting
 
 In future we might explore:
-- Stricter rate limiting (e.g., 10 new servers per user per day)
 - Potential AI-based spam detection
 - Community reporting and admin blacklisting capabilities
 

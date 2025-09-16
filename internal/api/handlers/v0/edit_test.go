@@ -36,7 +36,7 @@ func TestEditServerEndpoint(t *testing.T) {
 		},
 		Version: "1.0.0",
 	}
-	published, err := registryService.Publish(testServer)
+	published, err := registryService.Publish(testServer, "testuser", false)
 	assert.NoError(t, err)
 	assert.NotNil(t, published)
 	assert.NotNil(t, published.Meta)
@@ -56,7 +56,7 @@ func TestEditServerEndpoint(t *testing.T) {
 		},
 		Version: "1.0.0",
 	}
-	otherPublished, err := registryService.Publish(otherServer)
+	otherPublished, err := registryService.Publish(otherServer, "testuser", false)
 	assert.NoError(t, err)
 	assert.NotNil(t, otherPublished)
 	assert.NotNil(t, otherPublished.Meta)
@@ -76,7 +76,7 @@ func TestEditServerEndpoint(t *testing.T) {
 		},
 		Version: "1.0.0",
 	}
-	deletedPublished, err := registryService.Publish(deletedServer)
+	deletedPublished, err := registryService.Publish(deletedServer, "testuser", false)
 	assert.NoError(t, err)
 	assert.NotNil(t, deletedPublished)
 	assert.NotNil(t, deletedPublished.Meta)

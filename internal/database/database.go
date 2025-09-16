@@ -40,6 +40,13 @@ type Database interface {
 	UpdateServer(ctx context.Context, id string, server *apiv0.ServerJSON) (*apiv0.ServerJSON, error)
 	// Close closes the database connection
 	Close() error
+	
+	// Rate limiting methods
+	IncrementPublishCount(ctx context.Context, authMethodSubject string) error
+	GetPublishCount(ctx context.Context, authMethodSubject string, date time.Time) (int, error)
+	// CheckAndIncrementPublishCount atomically checks if the count is under the limit and increments if so
+	// Returns the current count and whether the increment was successful
+	CheckAndIncrementPublishCount(ctx context.Context, authMethodSubject string, limit int) (currentCount int, incrementSuccessful bool, err error)
 }
 
 // ConnectionType represents the type of database connection

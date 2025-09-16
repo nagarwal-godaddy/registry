@@ -53,8 +53,17 @@ func RegisterPublishEndpoint(api huma.API, registry service.RegistryService, cfg
 			return nil, huma.Error403Forbidden(buildPermissionErrorMessage(input.Body.Name, claims.Permissions))
 		}
 
+		// Check if user has global permissions (admin)
+		hasGlobalPermissions := false
+		for _, perm := range claims.Permissions {
+			if perm.ResourcePattern == "*" {
+				hasGlobalPermissions = true
+				break
+			}
+		}
+
 		// Publish the server with extensions
-		publishedServer, err := registry.Publish(input.Body)
+		publishedServer, err := registry.Publish(input.Body, claims.AuthMethodSubject, hasGlobalPermissions)
 		if err != nil {
 			return nil, huma.Error400BadRequest("Failed to publish server", err)
 		}

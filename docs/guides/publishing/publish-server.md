@@ -414,6 +414,9 @@ With authentication complete, publish your server:
 mcp-publisher publish
 ```
 
+> [!NOTE]
+> **Rate Limits**: The registry enforces a limit of 10 publishes per user per day to prevent abuse. If you exceed this limit, you'll receive an error message with your current count. If you need a higher limit for legitimate use cases, please [open an issue](https://github.com/modelcontextprotocol/registry/issues).
+
 You'll see output like:
 ```
 ✓ Successfully published

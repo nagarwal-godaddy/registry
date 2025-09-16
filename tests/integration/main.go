@@ -88,6 +88,13 @@ func publish(examples []example) error {
 		return errors.New(msg)
 	}
 	log.Println(msg)
+	
+	// Verify rate limiting is still enforced by attempting one more publish
+	// This should fail since we set the limit to 15 and have 13 examples
+	if err := verifyRateLimitEnforced(); err != nil {
+		return fmt.Errorf("rate limit verification failed: %w", err)
+	}
+	
 	return nil
 }
 
@@ -235,6 +242,63 @@ func findServerIDByName(serverName string) (string, error) {
 		return "", fmt.Errorf("found server %s but none marked as latest: %v", serverName, foundServers)
 	}
 	return "", fmt.Errorf("could not find any server with name %s", serverName)
+}
+
+func verifyRateLimitEnforced() error {
+	log.Println("Verifying rate limit enforcement...")
+	
+	// Create test servers for rate limit verification
+	// We've published 13 examples, limit is 15, so we can publish 2 more
+	testServers := []struct {
+		name        string
+		shouldFail  bool
+	}{
+		{"io.modelcontextprotocol.anonymous/rate-limit-test-1", false}, // 14th - should succeed
+		{"io.modelcontextprotocol.anonymous/rate-limit-test-2", false}, // 15th - should succeed  
+		{"io.modelcontextprotocol.anonymous/rate-limit-test-3", true},  // 16th - should fail
+	}
+	
+	for i, test := range testServers {
+		server := &apiv0.ServerJSON{
+			Name:        test.name,
+			Description: fmt.Sprintf("Rate limit test server %d", i+1),
+			Status:      "available",
+			Version:     "1.0.0",
+		}
+		
+		content, _ := json.Marshal(server)
+		p := filepath.Join("bin", fmt.Sprintf("rate-limit-test-%d.json", i+1))
+		if err := os.WriteFile(p, content, 0600); err != nil {
+			return fmt.Errorf("failed to write test file: %w", err)
+		}
+		defer os.Remove(p)
+		
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		
+		cmd := exec.CommandContext(ctx, "./bin/publisher", "publish", p)
+		cmd.WaitDelay = 100 * time.Millisecond
+		
+		out, err := cmd.CombinedOutput()
+		
+		if test.shouldFail {
+			if err == nil {
+				return fmt.Errorf("expected rate limit error for %s but got success", test.name)
+			}
+			if !strings.Contains(string(out), "rate limit") && !strings.Contains(string(out), "Rate limit") {
+				return fmt.Errorf("expected rate limit error for %s but got: %s", test.name, string(out))
+			}
+			log.Printf("  ✅ Rate limit correctly enforced on attempt %d (16th total)", i+1)
+		} else {
+			if err != nil {
+				return fmt.Errorf("unexpected error for %s: %s", test.name, string(out))
+			}
+			log.Printf("  ✅ Successfully published %s (within rate limit)", test.name)
+		}
+	}
+	
+	log.Println("  ✅ Rate limit enforcement verified successfully")
+	return nil
 }
 
 func verifyPublishedServer(id string, expected *apiv0.ServerJSON) error {

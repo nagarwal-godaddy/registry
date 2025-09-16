@@ -52,8 +52,8 @@ func TestServersListEndpoint(t *testing.T) {
 					},
 					Version: "2.0.0",
 				}
-				_, _ = registry.Publish(server1)
-				_, _ = registry.Publish(server2)
+				_, _ = registry.Publish(server1, "testuser", false)
+				_, _ = registry.Publish(server2, "testuser", false)
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -71,7 +71,7 @@ func TestServersListEndpoint(t *testing.T) {
 					},
 					Version: "1.5.0",
 				}
-				_, _ = registry.Publish(server)
+				_, _ = registry.Publish(server, "testuser", false)
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -141,8 +141,8 @@ func TestServersListEndpoint(t *testing.T) {
 					},
 					Version: "1.0.0",
 				}
-				_, _ = registry.Publish(server1)
-				_, _ = registry.Publish(server2)
+				_, _ = registry.Publish(server1, "testuser", false)
+				_, _ = registry.Publish(server2, "testuser", false)
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -160,7 +160,7 @@ func TestServersListEndpoint(t *testing.T) {
 					},
 					Version: "1.0.0",
 				}
-				_, _ = registry.Publish(server)
+				_, _ = registry.Publish(server, "testuser", false)
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -188,8 +188,8 @@ func TestServersListEndpoint(t *testing.T) {
 					},
 					Version: "2.0.0",
 				}
-				_, _ = registry.Publish(server1)
-				_, _ = registry.Publish(server2) // This will be marked as latest
+				_, _ = registry.Publish(server1, "testuser", false)
+				_, _ = registry.Publish(server2, "testuser", false) // This will be marked as latest
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -217,8 +217,8 @@ func TestServersListEndpoint(t *testing.T) {
 					},
 					Version: "1.0.0",
 				}
-				_, _ = registry.Publish(server1)
-				_, _ = registry.Publish(server2)
+				_, _ = registry.Publish(server1, "testuser", false)
+				_, _ = registry.Publish(server2, "testuser", false)
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -274,10 +274,10 @@ func TestServersListEndpoint(t *testing.T) {
 					},
 					Version: "3.0.0",
 				}
-				_, _ = registry.Publish(server1v1)
-				_, _ = registry.Publish(server1v2)
-				_, _ = registry.Publish(server2)
-				_, _ = registry.Publish(server3)
+				_, _ = registry.Publish(server1v1, "testuser", false)
+				_, _ = registry.Publish(server1v2, "testuser", false)
+				_, _ = registry.Publish(server2, "testuser", false)
+				_, _ = registry.Publish(server3, "testuser", false)
 			},
 			expectedStatus: http.StatusOK,
 		},
@@ -384,7 +384,7 @@ func TestServersDetailEndpoint(t *testing.T) {
 		Name:        "com.example/test-server",
 		Description: "A test server",
 		Version:     "1.0.0",
-	})
+	}, "testuser", false)
 	assert.NoError(t, err)
 
 	testCases := []struct {
@@ -472,7 +472,7 @@ func TestServersEndpointsIntegration(t *testing.T) {
 		Version: "1.0.0",
 	}
 
-	published, err := registryService.Publish(testServer)
+	published, err := registryService.Publish(testServer, "testuser", false)
 	assert.NoError(t, err)
 	assert.NotNil(t, published)
 

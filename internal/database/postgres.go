@@ -281,6 +281,80 @@ func (db *PostgreSQL) UpdateServer(ctx context.Context, id string, server *apiv0
 	return server, nil
 }
 
+// IncrementPublishCount atomically increments the publish count for an authenticated user today
+func (db *PostgreSQL) IncrementPublishCount(ctx context.Context, authMethodSubject string) error {
+	query := `
+		INSERT INTO publish_attempts (auth_method_subject, attempt_date, attempt_count, first_attempt_at, last_attempt_at)
+		VALUES ($1, CURRENT_DATE, 1, NOW(), NOW())
+		ON CONFLICT (auth_method_subject, attempt_date)
+		DO UPDATE SET 
+			attempt_count = publish_attempts.attempt_count + 1,
+			last_attempt_at = NOW()
+	`
+	_, err := db.pool.Exec(ctx, query, authMethodSubject)
+	if err != nil {
+		return fmt.Errorf("failed to increment publish count: %w", err)
+	}
+	return nil
+}
+
+// GetPublishCount returns the number of publishes for an authenticated user on a specific date
+func (db *PostgreSQL) GetPublishCount(ctx context.Context, authMethodSubject string, date time.Time) (int, error) {
+	var count int
+	query := `
+		SELECT COALESCE(attempt_count, 0) 
+		FROM publish_attempts 
+		WHERE auth_method_subject = $1 AND attempt_date = $2
+	`
+	err := db.pool.QueryRow(ctx, query, authMethodSubject, date.Format(time.DateOnly)).Scan(&count)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return 0, nil // No attempts yet
+		}
+		return 0, fmt.Errorf("failed to get publish count: %w", err)
+	}
+	return count, nil
+}
+
+// CheckAndIncrementPublishCount atomically checks if the count is under the limit and increments if so
+func (db *PostgreSQL) CheckAndIncrementPublishCount(ctx context.Context, authMethodSubject string, limit int) (currentCount int, incrementSuccessful bool, err error) {
+	// Use a CTE to atomically check and increment
+	query := `
+		WITH current_state AS (
+			SELECT COALESCE(attempt_count, 0) as count
+			FROM publish_attempts
+			WHERE auth_method_subject = $1 AND attempt_date = CURRENT_DATE
+			UNION ALL
+			SELECT 0 WHERE NOT EXISTS (
+				SELECT 1 FROM publish_attempts
+				WHERE auth_method_subject = $1 AND attempt_date = CURRENT_DATE
+			)
+			LIMIT 1
+		),
+		increment AS (
+			INSERT INTO publish_attempts (auth_method_subject, attempt_date, attempt_count, first_attempt_at, last_attempt_at)
+			SELECT $1, CURRENT_DATE, 1, NOW(), NOW()
+			WHERE (SELECT count FROM current_state) < $2
+			ON CONFLICT (auth_method_subject, attempt_date)
+			DO UPDATE SET 
+				attempt_count = publish_attempts.attempt_count + 1,
+				last_attempt_at = NOW()
+			WHERE publish_attempts.attempt_count < $2
+			RETURNING attempt_count
+		)
+		SELECT 
+			COALESCE((SELECT attempt_count FROM increment), (SELECT count FROM current_state)) as final_count,
+			EXISTS (SELECT 1 FROM increment) as was_incremented
+	`
+	
+	err = db.pool.QueryRow(ctx, query, authMethodSubject, limit).Scan(&currentCount, &incrementSuccessful)
+	if err != nil {
+		return 0, false, fmt.Errorf("failed to check and increment publish count: %w", err)
+	}
+	
+	return currentCount, incrementSuccessful, nil
+}
+
 // Close closes the database connection
 func (db *PostgreSQL) Close() error {
 	db.pool.Close()
